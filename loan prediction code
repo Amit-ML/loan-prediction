@@ -1,0 +1,160 @@
+# loan-prediction
+#load traning set given by AV(Analyticsvidhya)
+df=train_u6lujuX_CVtuZ9i
+View(df)
+
+#view missing values
+sapply(df, function(x) sum(is.na(x)))
+
+str(df)
+names(df)
+
+ df$Gender           <- as.factor(df$Gender)  
+ df$Married          <- as.factor(df$Married)
+ df$Dependents       <- as.factor(df$Dependents)
+ df$Education        <- as.factor(df$Education)
+ df$Self_Employed    <- as.factor(df$Self_Employed)  
+ df$ApplicantIncome  <-  as.numeric(df$ApplicantIncome)  
+ df$CoapplicantIncome <- as.numeric(df$CoapplicantIncome)  
+ df$LoanAmount       <-  as.numeric(df$LoanAmount)  
+ df$Loan_Amount_Term <-  as.numeric(df$Loan_Amount_Term)  
+ df$Credit_History   <-  as.factor(df$Credit_History)  
+ df$Property_Area    <-  as.factor(df$Property_Area)  
+ df$Loan_Status      <- as.factor(df$Loan_Status)
+ 
+ str(df)
+
+ #load library mice to impute missing values 
+ library(mice)
+ init = mice(df, maxit=0) 
+ meth = init$method
+ predM = init$predictorMatrix
+ 
+ #set different predicting algos for different features
+ meth[c("ApplicantIncome","CoapplicantIncome","LoanAmount","Loan_Amount_Term")]="norm" 
+ meth[c("Gender","Married","Self_Employed","Credit_History")]="logreg" 
+ meth[c("Property_Area","Dependents")]="polyreg"
+ 
+ set.seed(85)
+ imputed = mice(df, method=meth, predictorMatrix=predM, m=5)
+ 
+ dfimputed=complete(imputed)
+ 
+ sapply(dfimputed, function(x) sum(is.na(x)))
+ View(dfimputed)
+ 
+ write.csv(dfimputed,"dfimputed.csv") 
+
+ #for outlier detection n treatment for ApplicantIncome 
+ggplot(dfimputed, aes(x=ApplicantIncome))+geom_histogram(binwidth = 20)
+boxplot(dfimputed$ApplicantIncome) 
+quantile(dfimputed$ApplicantIncome,c(0.50,0.80,0.85,0.90,0.95,0.98,1)) 
+summary(dfimputed$ApplicantIncome)
+dfimputed$ApplicantIncome <- ifelse(dfimputed$ApplicantIncome>20000,20000,dfimputed$ApplicantIncome)
+
+#for outlier detection n treatment for coapplicantIncome
+ggplot(dfimputed, aes(x=CoapplicantIncome))+geom_histogram(binwidth = 500)
+boxplot(dfimputed$CoapplicantIncome) 
+quantile(dfimputed$CoapplicantIncome,c(0.50,0.80,0.85,0.90,0.95,0.98,0.99,1)) 
+summary(dfimputed$CoapplicantIncome)
+dfimputed$CoapplicantIncome <- ifelse(dfimputed$CoapplicantIncome>8000,8000,dfimputed$CoapplicantIncome)
+
+#for outlier detection n treatment for loanamount 
+ggplot(dfimputed, aes(x=LoanAmount))+geom_histogram(binwidth = 30)
+boxplot(dfimputed$LoanAmount) 
+quantile(dfimputed$LoanAmount,c(0.50,0.80,0.85,0.90,0.95,0.98,0.99,1)) 
+summary(dfimputed$LoanAmount)
+dfimputed$LoanAmount <- ifelse(dfimputed$LoanAmount>430,430,dfimputed$LoanAmount)
+
+#for outlier detection n treatment for loanamtterm
+ggplot(dfimputed, aes(x=Loan_Amount_Term))+geom_histogram(binwidth = 30)
+boxplot(dfimputed$Loan_Amount_Term) 
+quantile(dfimputed$Loan_Amount_Term,c(0.00,0.01,0.02,0.05,0.10,0.20,0.30,0.40,0.50,0.80,0.85,0.90,0.95,0.98,0.99,1)) 
+summary(dfimputed$Loan_Amount_Term)
+dfimputed$Loan_Amount_Term <- ifelse(dfimputed$Loan_Amount_Term<100,100,dfimputed$Loan_Amount_Term)
+
+
+
+#FE 
+names(dfimputed)
+dfimputed2=dfimputed[,c(-1,-2,-4,-5,-6,-7,-8,-9,-10)]
+View(dfimputed2)
+str(dfimputed2)
+
+write.csv(dfimputed2,"FEdfimputed2.csv")
+
+
+print(table(dfimputed2$Loan_Status))
+
+
+library(DMwR)
+
+dfimputed3<- SMOTE(Loan_Status ~ ., dfimputed2, perc.over = 100, perc.under=200)
+View(dfimputed3)
+print(table(dfimputed3$Loan_Status) )
+
+ #model .....................................................
+ 
+ # load the library
+ library(caret)
+ # define training control
+ train_control <- trainControl(method="repeatedcv", number=10, repeats=3)
+ # train the model
+ modelbayes1 <- train(Loan_Status~., data=dfimputed3, trControl=train_control, method="bayesglm")
+print(modelbayes1)
+summary(modelbayes1) 
+
+
+#...........................................
+
+#test dataset by AV 
+
+avtestdata=test_Y3wMUE5_7gLdaTN 
+View(avtestdata)
+avtestdata1=avtestdata
+
+str(avtestdata1)
+
+avtestdata1$Gender           <- as.factor(avtestdata1$Gender)  
+avtestdata1$Married          <- as.factor(avtestdata1$Married)
+avtestdata1$Dependents       <- as.factor(avtestdata1$Dependents)
+avtestdata1$Education        <- as.factor(avtestdata1$Education)
+avtestdata1$Self_Employed    <- as.factor(avtestdata1$Self_Employed)  
+avtestdata1$ApplicantIncome  <-  as.numeric(avtestdata1$ApplicantIncome)  
+avtestdata1$CoapplicantIncome <- as.numeric(avtestdata1$CoapplicantIncome)  
+avtestdata1$LoanAmount       <-  as.numeric(avtestdata1$LoanAmount)  
+avtestdata1$Loan_Amount_Term <-  as.numeric(avtestdata1$Loan_Amount_Term)  
+avtestdata1$Credit_History   <-  as.factor(avtestdata1$Credit_History)  
+avtestdata1$Property_Area    <-  as.factor(avtestdata1$Property_Area)  
+
+
+View(avtestdata1) 
+
+#check missing values in test data
+na=sapply(avtestdata1, function(x) sum(is.na(x)))
+na 
+
+#treat missing values in test data
+library(mice)
+init = mice(avtestdata1, maxit=0) 
+meth = init$method
+predM = init$predictorMatrix
+
+meth[c("ApplicantIncome","CoapplicantIncome","LoanAmount","Loan_Amount_Term")]="norm" 
+meth[c("Gender","Married","Self_Employed","Credit_History")]="logreg" 
+meth[c("Property_Area","Dependents")]="polyreg"
+
+set.seed(85)
+imputed = mice(avtestdata1, method=meth, predictorMatrix=predM, m=5)
+
+AVimputed=complete(imputed)
+sapply(AVimputed, function(x) sum(is.na(x)))
+View(AVimputed)
+
+
+#run model on test data 
+avimputedpredict1=predict(modelbayes1,newdata = AVimputed)
+
+AVimputed$predicted_loan_status_1=avimputedpredict1
+ 
+write.csv(AVimputed,"finalsolutionexcel.csv")
